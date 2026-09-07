@@ -3,7 +3,7 @@ Building my own http server from scratch
 """
 from asyncio.log import logger
 from http import HTTPStatus
-import logging
+import logger from log.config
 import os
 import socket
 import io
@@ -11,8 +11,6 @@ import io
 HOST = '127.0.0.1'
 PORT = 6666
 
-
-logger = logging.getLogger('http-server')
 
 class UDRequestHandler:
     def __init__(
