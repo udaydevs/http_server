@@ -11,18 +11,17 @@ import io
 HOST = '127.0.0.1'
 PORT = 6666
 
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger('http-server')
 
 class UDRequestHandler:
     def __init__(
             self,
             request_stream: io.BufferedIOBase,
             response_stream: io.BufferedIOBase,
-            client_address: tuple[str, int],
-            client: socket.socket,
         ):
         self.request_stream = request_stream
-        self.client = client
+        self.response_stream = response_stream
         self.command = ''
         self.path = ''
         self.header = {
@@ -31,7 +30,7 @@ class UDRequestHandler:
             'Connection' : 'close'
         }
         self.data = ''
-        self.handle()
+        self.handler()
 
     def _parse_request(self):
         logger.info('Parsing the request')
@@ -52,24 +51,24 @@ class UDRequestHandler:
         logger.info(headers)
 
     def handle_GET(self)-> None:
-                        '''Writes Header and file to the socket'''
-                        self.handle_HEAD()
-            
-                        with open(self.path ,'rb') as f:
-                            body = f.read()
-            
-                        self.response_stream.write(body)
-                        self.response_stream.flush() #flush to send data
-            
+        '''Writes Header and file to the socket'''
+        self.handle_HEAD()
+
+        with open(self.path ,'rb') as f:
+            body = f.read()
+
+        self.response_stream.write(body)
+        self.response_stream.flush() #flush to send data
+
     def handle_HEAD(self) -> None:
-                        '''Writes header to the socket'''
-                        self._write_response_line(200)
-                        self._write_headers(
-                            **{
-                                'Content_Length' : os.path.getsize(self.path)
-                            }
-                        )
-                        self.response_stream.flush() #flush to send the response
+        '''Writes header to the socket'''
+        self._write_response_line(200)
+        self._write_headers(
+                **{
+                    'Content_Length' : os.path.getsize(self.path)
+                }
+            )
+        self.response_stream.flush() #flush to send the response
 
     def handler(self) -> None:
                     '''This will Handle the request'''
@@ -98,7 +97,7 @@ class UDRequestHandler:
                         self.response_stream.write(response_line.encode())
             
     def _write_headers(self, *args, **kwargs):
-                        headers_copy = self.headers.copy()
+                        headers_copy = self.header.copy()
                         headers_copy.update(**kwargs)
                         headers_lines = '\r\n'.join(
                              f'{k}:{v}' for k, v in headers_copy.items()
@@ -153,7 +152,7 @@ class UDServer:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(socket_address)
-
+        logger.info('Started Serving')
         self.sock.listen()
 
     def serve_forever(self):
