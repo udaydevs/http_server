@@ -1,13 +1,13 @@
 """
 Building my own HTTP server from scratch
 """
-
+from __future__ import annotations
 from asyncio.log import logger
-from http import HTTPStatus
 import logging
 import os
 import socket
 import io
+from http import HTTPStatus
 
 logging.basicConfig(
     level=logging.INFO,
@@ -167,7 +167,7 @@ class UDRequestHandler:
         command()
 
     def _write_response_line(self, status_code: int) -> None:
-        response_line = f'HTTP/1.1 {status_code} NOTFOUND \r\n'
+        response_line = f'HTTP/1.1 {status_code} {HTTPStatus(status_code).phrase} \r\n'
 
         logger.info(response_line.encode())
 
@@ -206,7 +206,7 @@ class UDRequestHandler:
         if os.path.isdir(self.path):
             self.path = os.path.join(
                 self.path,
-                'index.html'
+                'http/index.html'
             )
 
             logger.info(self.path)
