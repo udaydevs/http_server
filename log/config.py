@@ -1,6 +1,4 @@
-'''
-Logging Configuration
-'''
+"""Shared logging configuration for the HTTP server project."""
 import logging
 
 logging.basicConfig(

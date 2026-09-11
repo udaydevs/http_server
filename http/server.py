@@ -1,6 +1,4 @@
-"""
-Building my own HTTP server from scratch
-"""
+"""HTTP server built directly on top of TCP sockets."""
 from __future__ import annotations
 from asyncio.log import logger
 import logging
@@ -20,16 +18,15 @@ logging.basicConfig(
 logger = logging.getLogger('http-server')
 
 
-"""Now we are going to build our own TCP server"""
-
-
 class UDServer:
+    """TCP server that accepts connections and delegates each request."""
 
     def __init__(
         self,
         socket_address: tuple[str, int],
         request_handler: UDRequestHandler
     ) -> None:
+        """Create, bind, and start listening on the given socket address."""
         self.request_handler = request_handler
         self.sock = socket.socket(
             socket.AF_INET,
@@ -47,6 +44,7 @@ class UDServer:
         self.sock.listen()
 
     def serve_forever(self):
+        """Accept client connections and handle them one at a time."""
         while True:
             conn, addr = self.sock.accept()
 
@@ -64,20 +62,23 @@ class UDServer:
             logger.info(f'Connection closed to {addr}')
 
     def __enter__(self) -> 'UDServer':
+        """Return the server for use as a context manager."""
         return self
 
     def __exit__(self, *args) -> None:
+        """Close the listening socket when leaving the context."""
         self.sock.close()
 
 
 class UDRequestHandler:
-    '''This handle request'''
+    """Parse one HTTP request and write the matching response."""
 
     def __init__(
         self,
         request_stream: io.BufferedIOBase,
         response_stream: io.BufferedIOBase,
     ):
+        """Store request streams and immediately handle the request."""
         self.request_stream = request_stream
         self.response_stream = response_stream
 
@@ -95,6 +96,7 @@ class UDRequestHandler:
         self.handler()
 
     def _parse_request(self):
+        """Read the request line and headers from the client stream."""
         logger.info('Parsing the request')
 
         requestline = self.request_stream.readline().decode()
@@ -118,7 +120,7 @@ class UDRequestHandler:
         logger.info(headers)
 
     def handle_GET(self) -> None:
-        '''Writes Header and file to the socket'''
+        """Send response headers followed by the requested file body."""
 
         self.handle_HEAD()
 
@@ -129,7 +131,7 @@ class UDRequestHandler:
         self.response_stream.flush()  # flush to send data
 
     def handle_HEAD(self) -> None:
-        '''Writes header to the socket'''
+        """Send response headers for the requested file."""
 
         self._write_response_line(200)
 
@@ -142,7 +144,7 @@ class UDRequestHandler:
         self.response_stream.flush()  # flush to send the response
 
     def handler(self) -> None:
-        '''This will Handle the request'''
+        """Route the parsed request to the supported method handler."""
 
         # Anything but GET and HEAD will return 405
         # POST will return 403
@@ -167,6 +169,7 @@ class UDRequestHandler:
         command()
 
     def _write_response_line(self, status_code: int) -> None:
+        """Write the HTTP status line for a response."""
         response_line = f'HTTP/1.1 {status_code} {HTTPStatus(status_code).phrase} \r\n'
 
         logger.info(response_line.encode())
@@ -174,6 +177,7 @@ class UDRequestHandler:
         self.response_stream.write(response_line.encode())
 
     def _write_headers(self, **kwargs):
+        """Write default headers merged with response-specific values."""
         headers_copy = self.header.copy()
         headers_copy.update(**kwargs)
 
@@ -189,10 +193,7 @@ class UDRequestHandler:
         self.response_stream.write(b'\r\n\r\n')
 
     def _validate_path(self) -> bool:
-        '''
-        It validates the path. Returns True if the path is valid,
-        otherwise False
-        '''
+        """Resolve the request path and return whether it exists."""
 
         # Path can either be file or dictionary
         # if the path is dictionary, look for index.html
@@ -220,19 +221,19 @@ class UDRequestHandler:
         return False
 
     def _return_404(self) -> None:
-        '''NOT FOUND'''
+        """Send a 404 Not Found response."""
 
         self._write_response_line(404)
         self._write_headers()
 
     def _return_405(self) -> None:
-        '''METHOD NOT ALLOWED'''
+        """Send a 405 Method Not Allowed response."""
 
         self._write_response_line(405)
         self._write_headers()
 
     def _return_403(self) -> None:
-        '''FORBIDDEN'''
+        """Send a 403 Forbidden response."""
 
         self._write_response_line(403)
         self._write_headers()

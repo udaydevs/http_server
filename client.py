@@ -1,3 +1,5 @@
+"""Simple TCP client used to test the local socket server."""
+
 import socket
 
 HOST = '127.0.0.1'

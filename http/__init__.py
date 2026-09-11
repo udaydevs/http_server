@@ -1,12 +1,13 @@
-'''Variables are defined here'''
+"""HTTP status helpers used by the local server package."""
 
 
 __all__ = ['HTTPStatus']
 
 class HTTPStatus:
-    """HTTP status codes are defined here"""
+    """Represents an HTTP status code with phrase and description text."""
 
     def __new__(cls, value, phrase, description=''):
+        """Create a status value with its phrase and optional description."""
         obj = int.__new__(cls, value)
         obj._value_ = value
 
@@ -16,22 +17,27 @@ class HTTPStatus:
 
     @property
     def is_informational(self):
+        """Return True for 1xx informational status codes."""
         return 100 <= self <= 199
 
     @property
     def is_success(self):
+        """Return True for 2xx successful status codes."""
         return 200 <= self <= 299
 
     @property
     def is_redirection(self):
+        """Return True for 3xx redirection status codes."""
         return 300 <= self <= 399
 
     @property
     def is_client_error(self):
+        """Return True for 4xx client error status codes."""
         return 400 <= self <= 499
 
     @property
     def is_server_error(self):
+        """Return True for 5xx server error status codes."""
         return 500 <= self <= 599
 
     # informational
@@ -271,4 +277,3 @@ class HTTPStatus:
     NETWORK_AUTHENTICATION_REQUIRED = (511,
         'Network Authentication Required',
         'The client needs to authenticate to gain network access')
-
