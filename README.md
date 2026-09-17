@@ -1,4 +1,4 @@
-# Uday HTTP Server
+HTTP Server
 
 A small HTTP server built from scratch with Python TCP sockets. It is a learning project that parses basic HTTP requests and serves local files.
 
