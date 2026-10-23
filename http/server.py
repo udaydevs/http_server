@@ -1,10 +1,11 @@
 """HTTP server built directly on top of TCP sockets."""
 from __future__ import annotations
-from asyncio.log import logger
-import logging
 import os
+from pathlib import Path
 import socket
 import io
+import logging
+import mimetypes
 from http import HTTPStatus
 
 logging.basicConfig(
@@ -15,8 +16,12 @@ logging.basicConfig(
     ]
 )
 
-logger = logging.getLogger('http-server')
+logger = logging.getLogger(
+    'http-server'
+)
 
+class SecurityException(Exception):
+    pass
 
 class UDServer:
     """TCP server that accepts connections and delegates each request."""
@@ -35,7 +40,7 @@ class UDServer:
         self.sock.setsockopt(
             socket.SOL_SOCKET,
             socket.SO_REUSEADDR,
-            1
+            1,
         )
         self.sock.bind(socket_address)
 
@@ -49,7 +54,7 @@ class UDServer:
             conn, addr = self.sock.accept()
 
             with conn:
-                logger.info(f'Connected to {addr}')
+                logger.info('Connected to %s', {addr})
 
                 request_stream = conn.makefile('rb')
                 response_stream = conn.makefile('wb')
@@ -59,7 +64,7 @@ class UDServer:
                     response_stream=response_stream
                 )
 
-            logger.info(f'Connection closed to {addr}')
+            logger.info('Connection closed to %s', {addr})
 
     def __enter__(self) -> 'UDServer':
         """Return the server for use as a context manager."""
@@ -86,7 +91,7 @@ class UDRequestHandler:
         self.path = ''
 
         self.header = {
-            'Content-Type': 'text/html',
+            'Content-Type': 'text/uday',
             'Content-Length': '0',
             'Connection': 'close'
         }
@@ -101,6 +106,9 @@ class UDRequestHandler:
 
         requestline = self.request_stream.readline().decode()
         requestline = requestline.rstrip('\r\n')
+        if len(requestline) > 8 * 1024:
+            print(len(requestline))
+            return HTTPStatus(401).phrase
 
         logger.info(requestline)
 
@@ -120,8 +128,9 @@ class UDRequestHandler:
         logger.info(headers)
 
     def handle_GET(self) -> None:
-        """Send response headers followed by the requested file body."""
-
+        '''
+        Writes headers and the file to the socket.
+        '''
         self.handle_HEAD()
 
         with open(self.path, 'rb') as f:
@@ -130,18 +139,26 @@ class UDRequestHandler:
         self.response_stream.write(body)
         self.response_stream.flush()  # flush to send data
 
+    def handle_POST(self) ->None:
+        """Send response headers followed by the request body"""
+        self.handle_HEAD()
+
     def handle_HEAD(self) -> None:
-        """Send response headers for the requested file."""
+        """
+        Send response headers for the requested file.
+        It ensures that HEAD does not contains response body
+        """
 
         self._write_response_line(200)
 
         self._write_headers(
             **{
+                'Content-Type' : mimetypes.guess_type(self.path,strict=True)[0],
                 'Content-Length': os.path.getsize(self.path)
             }
         )
 
-        self.response_stream.flush()  # flush to send the response
+        self.response_stream.flush()
 
     def handler(self) -> None:
         """Route the parsed request to the supported method handler."""
@@ -155,10 +172,7 @@ class UDRequestHandler:
         if not self._validate_path():
             return self._return_404()
 
-        if self.command == 'POST':
-            return self._return_403()
-
-        if self.command not in ('GET', 'HEAD'):
+        if self.command not in ('GET', 'HEAD', 'POST'):
             return self._return_405()
 
         command = getattr(
@@ -188,27 +202,27 @@ class UDRequestHandler:
         logger.info(headers_lines.encode())
 
         self.response_stream.write(headers_lines.encode())
-
-        # Marking the ends of the headers
         self.response_stream.write(b'\r\n\r\n')
 
     def _validate_path(self) -> bool:
-        """Resolve the request path and return whether it exists."""
-
-        # Path can either be file or dictionary
-        # if the path is dictionary, look for index.html
-        # if it's file, serve it
-
-        self.path = os.path.join(
-            os.getcwd(),
-            self.path.lstrip('/')
-        )
-
-        if os.path.isdir(self.path):
-            self.path = os.path.join(
-                self.path,
-                'http/index.html'
-            )
+        """
+        Resolve the request path and validation to 
+        prevent from attacks like path traversal
+        """
+        filename = os.getcwd()
+        print(filename)
+        working_path = 'http/index.html'
+        if os.path.isdir(filename):
+            path = Path(
+                os.path.join(filename,working_path)
+                ).resolve() #it will resolve the path to absolute path
+            print(path)
+            resolved_path = (filename/path).resolve() #construct the absolute path requested
+            if not str(resolved_path).startswith(str(path)):
+                raise SecurityException(
+                    "Invalid path: Attempt to access a file outside the allowed workspace."
+                    )
+            self.path = resolved_path
 
             logger.info(self.path)
 
