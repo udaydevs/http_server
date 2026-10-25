@@ -93,7 +93,8 @@ class UDRequestHandler:
         self.header = {
             'Content-Type': 'text/uday',
             'Content-Length': '0',
-            'Connection': 'close'
+            'Connection': 'keep-alive',
+            'Keep-Alive': 'timeout=5, max=100'
         }
 
         self.data = ''
@@ -160,6 +161,21 @@ class UDRequestHandler:
 
         self.response_stream.flush()
 
+    def handle_OPTIONS(self) -> None:
+        """
+        Pre-flight request mainly used to handle CORS
+        """
+        self._write_response_line(204)
+        self._write_headers(**{
+            'Allow': 'GET, HEAD, POST, OPTIONS',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Content-Length': '0',
+            'Connection': 'close'
+        })
+        self.response_stream.flush()
+
     def handler(self) -> None:
         """Route the parsed request to the supported method handler."""
 
@@ -172,7 +188,7 @@ class UDRequestHandler:
         if not self._validate_path():
             return self._return_404()
 
-        if self.command not in ('GET', 'HEAD', 'POST'):
+        if self.command not in ('GET', 'HEAD', 'POST', 'OPTIONS'):
             return self._return_405()
 
         command = getattr(
